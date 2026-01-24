@@ -2,7 +2,9 @@ package download
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -101,6 +103,11 @@ func isTransientError(err error) bool {
 	// Check for cancellation errors - these should be passed through
 	if downloadErr, ok := err.(*DownloadError); ok && downloadErr.Type == "DownloadCancelled" {
 		return false
+	}
+
+	// Unexpected EOFs are typically network hiccups; retry them
+	if errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, io.EOF) || strings.Contains(err.Error(), "unexpected EOF") {
+		return true
 	}
 
 	// Check for grab errors
