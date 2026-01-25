@@ -27,6 +27,9 @@ type DownloadConfig struct {
 
 	// CopyTimeout is the timeout for waiting for the copy operation to complete after cancellation
 	CopyTimeout time.Duration
+
+	// RetryDelay is how long to wait before requeueing a failed file for another attempt
+	RetryDelay time.Duration
 }
 
 // GetDefaultConfig returns a DownloadConfig with reasonable default values
@@ -40,5 +43,6 @@ func GetDefaultConfig() *DownloadConfig {
 		DownloadHeaderTimeout:  30 * time.Second, // 30 second timeout for response headers
 		DownloadStallTimeout:   2 * time.Minute,  // Cancel download if stalled for 2 minutes
 		CopyTimeout:            10 * time.Second, // Wait 10 seconds for copy to complete after cancellation
+		RetryDelay:             30 * time.Second, // Wait 30 seconds before requeueing failed files
 	}
 }

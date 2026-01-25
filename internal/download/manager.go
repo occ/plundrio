@@ -2,6 +2,7 @@ package download
 
 import (
 	"sync"
+	"time"
 
 	"github.com/elsbrock/plundrio/internal/api"
 	"github.com/elsbrock/plundrio/internal/config"
@@ -176,6 +177,48 @@ func (m *Manager) QueueDownload(job downloadJob) {
 		// Manager is shutting down, just remove from active files
 		m.activeFiles.Delete(job.FileID)
 	}
+}
+
+// scheduleFileRetry requeues a failed file after a delay so it keeps retrying until success or shutdown
+func (m *Manager) scheduleFileRetry(job downloadJob) {
+	delay := m.dlConfig.RetryDelay
+	if delay <= 0 {
+		delay = 30 * time.Second
+	}
+
+	go func() {
+		timer := time.NewTimer(delay)
+		defer timer.Stop()
+
+		select {
+		case <-m.stopChan:
+			log.Info("download").
+				Str("file_name", job.Name).
+				Int64("file_id", job.FileID).
+				Msg("Skipping retry because manager is stopping")
+			return
+		case <-timer.C:
+		}
+
+		// Ensure the transfer still exists before requeueing
+		if _, exists := m.coordinator.GetTransferContext(job.TransferID); !exists {
+			log.Debug("download").
+				Str("file_name", job.Name).
+				Int64("file_id", job.FileID).
+				Int64("transfer_id", job.TransferID).
+				Msg("Skipping retry because transfer context is gone")
+			return
+		}
+
+		log.Info("download").
+			Str("file_name", job.Name).
+			Int64("file_id", job.FileID).
+			Int64("transfer_id", job.TransferID).
+			Dur("delay", delay).
+			Msg("Re-queueing failed file for retry")
+
+		m.QueueDownload(job)
+	}()
 }
 
 // cleanupTransfer handles the deletion of a completed transfer and its source files

@@ -55,6 +55,9 @@ func (m *Manager) downloadWorker() {
 
 				// Mark this file as failed in the transfer context
 				m.handleFileFailure(job.TransferID)
+
+				// Requeue the failed file for another attempt after a delay
+				m.scheduleFileRetry(job)
 				continue
 			}
 			// Pass both transferID and fileID to handleFileCompletion
